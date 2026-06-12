@@ -310,7 +310,7 @@ export default function AppPreviewPage() {
                       </Button>
                       <Button
                         variant="outline"
-                        size="xs"
+                        size="sm"
                         className="h-8"
                         disabled={page >= totalPages}
                         onClick={() => setPage((p) => p + 1)}
