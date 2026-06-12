@@ -53,5 +53,6 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Expose API port
 EXPOSE 3001
 
-# Run migrations then start the NestJS application
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/main"]
+# Run migrations (non-fatal) then start the NestJS application
+# The || true ensures the API starts even if migrations are already applied or fail
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma || true && node apps/api/dist/main"]
