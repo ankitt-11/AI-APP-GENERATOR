@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aiappgen-db
+    environment:
+      POSTGRES_DB: aiappgen
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aiappgen"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: aiappgen-api
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/aiappgen?schema=public
+      - JWT_SECRET=dev-jwt-secret-key-must-be-very-long-and-secure-for-nest
+      - JWT_EXPIRES_IN=15m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /app/node_modules
+      - ./apps/api:/app/apps/api
+      - ./packages/shared:/app/packages/shared
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    container_name: aiappgen-web
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=dev-next-auth-session-secret-key-must-be-secure
+    depends_on:
+      - api
+    volumes:
+      - /app/node_modules
+      - ./apps/web:/app/apps/web
+      - ./packages/shared:/app/packages/shared
+
+volumes:
+  postgres_data:

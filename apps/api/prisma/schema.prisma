@@ -1,0 +1,254 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum FieldType {
+  text
+  number
+  email
+  boolean
+  date
+  select
+}
+
+enum WorkflowStatus {
+  pending
+  running
+  success
+  failed
+}
+
+enum NotificationType {
+  workflow_executed
+  record_created
+  record_updated
+  record_deleted
+  csv_imported
+  validation_warning
+}
+
+enum ImportStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  apps          App[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  imports       Import[]
+
+  @@map("users")
+}
+
+model App {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String
+  description String?
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  metadataVersions MetadataVersion[]
+  entities         Entity[]
+  workflows        Workflow[]
+  imports          Import[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId])
+  @@map("apps")
+}
+
+model MetadataVersion {
+  id         String   @id @default(cuid())
+  appId      String
+  version    Int
+  definition Json     // Full AppMetadata JSON
+  changelog  String?
+  isActive   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, version])
+  @@index([appId, isActive])
+  @@map("metadata_versions")
+}
+
+model Entity {
+  id          String   @id @default(cuid())
+  appId       String
+  name        String   // "Employee"
+  slug        String   // "employee"
+  icon        String?
+  description String?
+  displayConfig Json?  // DisplayConfig JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  app     App           @relation(fields: [appId], references: [id], onDelete: Cascade)
+  fields  EntityField[]
+  records EntityRecord[]
+
+  @@unique([appId, slug])
+  @@index([appId])
+  @@map("entities")
+}
+
+model EntityField {
+  id           String    @id @default(cuid())
+  entityId     String
+  name         String    // "Email Address"
+  slug         String    // "email_address"
+  type         FieldType
+  required     Boolean   @default(false)
+  defaultValue String?
+  options      Json?     // [{label, value}] for select fields
+  validation   Json?     // ValidationConfig
+  component    String?   // Override component type
+  displayIn    String[]  // ['table','form','detail']
+  order        Int       @default(0)
+  placeholder  String?
+  helpText     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, slug])
+  @@index([entityId])
+  @@map("entity_fields")
+}
+
+model EntityRecord {
+  id        String   @id @default(cuid())
+  entityId  String
+  data      Json     // { fieldSlug: value, ... }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([entityId])
+  @@index([entityId, createdAt])
+  @@map("entity_records")
+}
+
+model Workflow {
+  id        String   @id @default(cuid())
+  appId     String
+  name      String
+  entityId  String?  // Null = applies to all entities
+  trigger   String   // record_created | record_updated | record_deleted
+  actions   Json     // WorkflowAction[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  app  App           @relation(fields: [appId], references: [id], onDelete: Cascade)
+  runs WorkflowRun[]
+
+  @@index([appId])
+  @@index([entityId, trigger])
+  @@map("workflows")
+}
+
+model WorkflowRun {
+  id         String         @id @default(cuid())
+  workflowId String
+  status     WorkflowStatus @default(pending)
+  trigger    String
+  payload    Json           // { entityId, recordId, data }
+  result     Json?          // Action results
+  error      String?
+  executedAt DateTime       @default(now())
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([executedAt])
+  @@map("workflow_runs")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  metadata  Json?            // Extra context (appId, entityId, etc.)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model Import {
+  id          String       @id @default(cuid())
+  appId       String
+  userId      String
+  entityId    String
+  filename    String
+  status      ImportStatus @default(pending)
+  totalRows   Int          @default(0)
+  successRows Int          @default(0)
+  failedRows  Int          @default(0)
+  report      Json?        // ImportReport JSON
+  mappings    Json?        // FieldMapping[] JSON
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  app  App  @relation(fields: [appId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([appId])
+  @@index([userId])
+  @@map("imports")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   // See AuditAction type
+  resource   String   // users | apps | entities | workflows | imports
+  resourceId String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

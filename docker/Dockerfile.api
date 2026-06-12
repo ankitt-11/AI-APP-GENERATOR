@@ -1,0 +1,57 @@
+# ─── Stage 1: Builder ─────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache libc6-compat openssl
+
+# Copy workspace package configurations first (better layer caching)
+COPY package.json turbo.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install all dependencies
+RUN npm install
+
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY apps/api ./apps/api
+
+# Generate Prisma Client
+RUN npx prisma generate --schema=./apps/api/prisma/schema.prisma
+
+# Build shared package first, then the NestJS API
+RUN npm run build --workspace=@repo/shared
+RUN npm run build --workspace=@repo/api
+
+# ─── Stage 2: Runner (lean production image) ──────────────────────────────────
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat openssl
+
+ENV NODE_ENV=production
+
+# Copy workspace manifests and install production deps only
+COPY package.json turbo.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN npm install --omit=dev
+
+# Copy built outputs from builder stage
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+
+# Copy Prisma schema and generated client (needed at runtime)
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# Expose API port
+EXPOSE 3001
+
+# Run migrations then start the NestJS application
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma && node apps/api/dist/main"]
