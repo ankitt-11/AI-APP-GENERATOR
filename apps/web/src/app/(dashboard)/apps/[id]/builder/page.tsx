@@ -299,7 +299,7 @@ export default function MetadataBuilderPage() {
                 </div>
                 <h3 className="font-semibold text-sm flex-1">AI Schema Assistant</h3>
                 {hasSuggestions && (
-                  <Button size="xs" variant="outline" onClick={applyRepairs} className="h-6 text-[10px] bg-white text-zinc-800 hover:bg-zinc-50 border-zinc-200">
+                  <Button size="sm" variant="outline" onClick={applyRepairs} className="h-6 text-[10px] bg-white text-zinc-800 hover:bg-zinc-50 border-zinc-200">
                     Auto-Repair All
                   </Button>
                 )}

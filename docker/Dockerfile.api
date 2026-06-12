@@ -55,4 +55,4 @@ EXPOSE 3001
 
 # Run migrations (non-fatal) then start the NestJS application
 # The || true ensures the API starts even if migrations are already applied or fail
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma || true && node apps/api/dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=./apps/api/prisma/schema.prisma || true && node apps/api/dist/apps/api/src/main.js"]
