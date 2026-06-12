@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiClientError } from '@/lib/api/client';
+import Link from 'next/link';
 
 type Step = 'upload' | 'mapping' | 'results';
 
