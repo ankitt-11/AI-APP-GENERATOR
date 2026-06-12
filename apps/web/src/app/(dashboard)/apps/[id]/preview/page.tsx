@@ -301,7 +301,7 @@ export default function AppPreviewPage() {
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        size="xs"
+                        size="sm"
                         className="h-8"
                         disabled={page <= 1}
                         onClick={() => setPage((p) => p - 1)}
