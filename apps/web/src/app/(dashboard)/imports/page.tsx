@@ -262,7 +262,7 @@ export default function CsvImportsPage() {
               <CardTitle className="text-lg">Schema & Column Alignment</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">Map each header column found in CSV file to matching database fields</p>
             </div>
-            <Button variant="ghost" size="xs" onClick={resetWizard} className="h-7 text-[10px]">
+            <Button variant="ghost" size="sm" onClick={resetWizard} className="h-7 text-[10px]">
               Cancel & Start Over
             </Button>
           </CardHeader>
